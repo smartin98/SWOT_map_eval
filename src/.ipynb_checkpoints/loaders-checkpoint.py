@@ -3,6 +3,7 @@ import xarray as xr
 import datetime
 import os
 import pandas as pd
+import datetime
 
 def convert_string_to_npdatetime(string):
     datetime_obj = pd.to_datetime(string, format="%Y%m%dT%H%M%S", errors='coerce', yearfirst=True, utc=True)
@@ -14,6 +15,7 @@ def find_swot_start_end(files, file_prefix = 'SWOT_L3_LR_SSH_Basic_XXX_YYY_'):
     end_dates = [convert_string_to_npdatetime(f[len(file_prefix)+16:len(file_prefix)+16+15]) for f in files]
     
     return start_dates, end_dates
+
 
 class SWOT_L3_Dataset:
     
@@ -94,3 +96,72 @@ class SWOT_L3_Dataset:
         total_mask = mask_lon & mask_lat & mask_time
         
         return self.ds.where(total_mask, drop = True)
+    
+class Map_L4_Dataset:
+    
+    """
+    A dataset for storing Mapped L4 SSH data from a directory of NetCDFs with 1 file per day for dates between two datetimes.
+
+    Attributes:
+        data_dir (str): The directory containing L4 NetCDF files.
+        window_start (np.datetime64): Start datetime of the window to load data from
+        window_end (np.datetime64): End datetime of the window to load data from
+        
+        
+    Methods:
+        
+    """
+    
+    def __init__(self, datadir, window_start, window_end, keep_vars = ['sla', 'adt'], name_convention = {'prefix': 'NeurOST_SSH-SST_', 'date_hyphenated': False, 'suffix_format': '_YYYYMMDD.nc'}):
+        
+        self.window_start = window_start
+        self.window_end = window_end
+        self.keep_vars = keep_vars
+        
+        def extract_map_date(files, name_convention):
+            return [f[len(name_convention['prefix']):-len(name_convention['suffix_format'])] for f in files]
+        
+        def str_to_datetime(string):
+            return np.datetime64(string[:4] + '-' + string[4:6] + '-' + string[6:8] + "T00:00:00")
+        
+        files = sorted(os.listdir(datadir))
+        files = [f for f in files if '.nc' in f]
+        
+        map_date_strs = extract_map_date(files, name_convention)
+        
+        if name_convention['date_hyphenated']:
+            map_date_strs = [s.replace('-', '') for s in map_date_strs]
+        
+        map_dates = [str_to_datetime(s) for s in map_date_strs]
+        
+        files_load = []
+        for i, f in enumerate(files):
+            check_start = (map_dates[i] > window_start)
+            check_end = (map_dates[i] < window_end + np.timedelta64(1, 'D')) # add 1 day to end to allow interpolation
+            if check_start and check_end:
+                files_load.append(f)
+        
+        if datadir[-1] == '/':
+            files_load = [datadir + f for f in files_load]
+        else:
+            files_load = [datadir + '/' + f for f in files_load]
+            
+        self.ds = xr.open_mfdataset(files_load)
+        
+        # clean up to make sure names and ranges consistent with SWOT coords:
+        
+        if 'lon' in list(self.ds.dims):
+            self.ds = self.ds.rename({'lon': 'longitude'})
+        if 'lat' in list(self.ds.dims):
+            self.ds = self.ds.rename({'lon': 'latitude'})
+        
+        if self.ds['longitude'].min() < 0:
+            self.ds['longitude'] = self.ds['longitude'] % 360
+            self.ds = self.ds.sortby('longitude')
+            
+        self.ds = self.ds[keep_vars]
+            
+        
+        
+        
+        
