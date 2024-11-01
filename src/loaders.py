@@ -75,22 +75,22 @@ class SWOT_L3_Dataset:
         if (lon_min is not None) or (lon_max is not None):
             mask_lon = ((self.ds['longitude'] > lon_min) & (self.ds['longitude'] < lon_max)).astype('bool')
         else:
-            mask_lon = xr.DataArray(True, dims=self.ds.dims, coords={'longitude': self.ds['longitude'], 'latitude': self.ds['latitude']})
+            mask_lon = xr.DataArray(True, dims=self.ds.dims, coords=self.ds.coords)
         
         # latitude masking
         if (lat_min is not None) or (lat_max is not None):
             mask_lat = ((self.ds['latitude'] > lat_min) & (self.ds['latitude'] < lat_max)).astype('bool')
         else:
-            mask_lat = xr.DataArray(True, dims=self.ds.dims, coords={'longitude': self.ds['longitude'], 'latitude': self.ds['latitude']})
+            mask_lat = xr.DataArray(True, dims=self.ds.dims, coords=self.ds.coords)
             
         # time masking
         if (time_min is not None) or (time_max is not None):
             mask_time = ((self.ds['time'] > time_min) & (self.ds['time'] < time_max)).astype('bool')
         else:
-            mask_time = xr.DataArray(True, dims=self.ds.dims, coords={'longitude': self.ds['longitude'], 'latitude': self.ds['latitude']})
+            mask_time = xr.DataArray(True, dims=self.ds.dims, coords=self.ds.coords)
             
         # total mask by combining all 3:
         
         total_mask = mask_lon & mask_lat & mask_time
         
-        return self.ds.where(total_mask)
+        return self.ds.where(total_mask, drop = True)
