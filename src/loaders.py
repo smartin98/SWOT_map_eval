@@ -153,7 +153,7 @@ class Map_L4_Dataset:
         if 'lon' in list(self.ds.dims):
             self.ds = self.ds.rename({'lon': 'longitude'})
         if 'lat' in list(self.ds.dims):
-            self.ds = self.ds.rename({'lon': 'latitude'})
+            self.ds = self.ds.rename({'lat': 'latitude'})
         
         if self.ds['longitude'].min() < 0:
             self.ds['longitude'] = self.ds['longitude'] % 360
