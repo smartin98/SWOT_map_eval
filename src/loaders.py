@@ -45,6 +45,7 @@ class SWOT_L3_Dataset:
         
             files = sorted(os.listdir(datadir))
             files = [f for f in files if '.nc' in f]
+
             start_dates, end_dates = find_swot_start_end(files, file_prefix)
 
             files_load = []
@@ -80,6 +81,10 @@ class SWOT_L3_Dataset:
 
             self.ds = xr.concat(datasets, dim = 'num_lines')
             
+            mask_time = ((self.ds['time'] > window_start) & (self.ds['time'] < window_end)).astype('bool')
+            
+            self.ds = self.ds.where(mask_time, drop = True)
+            
         else:
             self.ds = ds
         
@@ -104,7 +109,7 @@ class SWOT_L3_Dataset:
             
         # total mask by combining all 3:
         
-        total_mask = mask_lon & mask_lat & mask_time
+        mask_total = mask_lon & mask_lat & mask_time
         
         return self.ds.where(total_mask, drop = True)
     
@@ -123,9 +128,24 @@ class SWOT_L3_Dataset:
                               window_end = self.window_end,
                               keep_vars = self.keep_vars,
                               file_prefix = self.file_prefix,
-                              ds = self.ds.where(total_mask, drop = True),
+                              ds = self.ds.where(mask_total, drop = True),
                               bounds = bounds
                              )
+    
+    def clone(self):
+        # return another instance of the class but with subset
+        return SWOT_L3_Dataset(datadir = self.datadir, 
+                              window_start = self.window_start, 
+                              window_end = self.window_end,
+                              keep_vars = self.keep_vars,
+                              file_prefix = self.file_prefix,
+                              ds = self.ds,
+                              bounds = self.bounds
+                             )
+    
+    def add_vars(self, data, var_names):
+        for v, name in enumerate(var_names):
+            self.ds[name] = data[v]
     
 class Map_L4_Dataset:
     
@@ -171,8 +191,8 @@ class Map_L4_Dataset:
 
             files_load = []
             for i, f in enumerate(files):
-                check_start = (map_dates[i] > window_start)
-                check_end = (map_dates[i] < window_end + np.timedelta64(1, 'D')) # add 1 day to end to allow interpolation
+                check_start = (map_dates[i] >= window_start)
+                check_end = (map_dates[i] <= window_end + np.timedelta64(1, 'D')) # add 1 day to end to allow interpolation
                 if check_start and check_end:
                     files_load.append(f)
 
@@ -193,9 +213,8 @@ class Map_L4_Dataset:
             if self.ds['longitude'].min() < 0:
                 self.ds['longitude'] = self.ds['longitude'] % 360
                 self.ds = self.ds.sortby('longitude')
-
+                
             self.ds = self.ds[keep_vars]
-            
         else:
             self.ds = ds
         
@@ -220,7 +239,7 @@ class Map_L4_Dataset:
             
         # total mask by combining all 3:
         
-        total_mask = mask_lon & mask_lat & mask_time
+        mask_total = mask_lon & mask_lat & mask_time
         
         bounds = {'lon_min': lon_min, 
                   'lon_max': lon_max, 
@@ -236,8 +255,18 @@ class Map_L4_Dataset:
                               window_end = self.window_end,
                               keep_vars = self.keep_vars,
                               name_convention = self.name_convention,
-                              ds = self.ds.where(total_mask, drop = True),
+                              ds = self.ds.where(mask_total, drop = True),
                               bounds = bounds
+                             )
+    
+    def clone(self):
+        return Map_L4_Dataset(datadir = self.datadir, 
+                              window_start = self.window_start, 
+                              window_end = self.window_end,
+                              keep_vars = self.keep_vars,
+                              name_convention = self.name_convention,
+                              ds = self.ds,
+                              bounds = self.bounds
                              )
             
         
