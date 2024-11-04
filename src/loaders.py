@@ -32,45 +32,56 @@ class SWOT_L3_Dataset:
         
     """
     
-    def __init__(self, datadir, window_start, window_end, keep_vars = ['ssha', 'mdt', 'time', 'quality_flag'], file_prefix = 'SWOT_L3_LR_SSH_Expert_XXX_YYY_'):
+    def __init__(self, datadir, window_start, window_end, keep_vars = ['ssha', 'mdt', 'time', 'quality_flag'], file_prefix = 'SWOT_L3_LR_SSH_Expert_XXX_YYY_', ds = None, bounds = None):
         
-        files = sorted(os.listdir(datadir))
-        files = [f for f in files if '.nc' in f]
-        start_dates, end_dates = find_swot_start_end(files, file_prefix)
+        self.datadir = datadir
+        self.window_start = window_start
+        self.window_end = window_end
+        self.keep_vars = keep_vars
+        self.file_prefix = file_prefix
+        self.bounds = bounds
         
-        files_load = []
+        if ds is None:
         
-        for i, f in enumerate(files):
-            if end_dates[i]>window_start and start_dates[i]<window_end:
-                files_load.append(f)
-            elif start_dates[i]>window_start and start_dates[i]<window_end:
-                files_load.append(f)
-            elif end_dates[i]>window_start and end_dates[i]<window_end:
-                files_load.append(f)
-                
-        paths_load = [datadir +'/' + f for f in files_load]
-        paths_load = sorted(paths_load)
-        
-        num_lines_global = 0
-        datasets = []
-        for i, f in enumerate(paths_load):
-            ds = xr.open_dataset(f)
-            # mask = ((ds.num_lines == ds['i_num_line']) & (ds.num_pixels == ds['i_num_pixel'])).sum(dim='num_nadir').astype('bool')#.plot()
-            # ds = ds.where(~mask)
-            ds = ds.drop(['i_num_line', 'i_num_pixel'])
-            time_expanded = xr.DataArray(
-                                        np.repeat(ds.time.values[:, np.newaxis], ds['num_pixels'].values.shape[0], -1),
-                                        dims=('num_lines', 'num_pixels'),
-                                        coords={'num_lines': ds.num_lines, 'num_pixels': ds.num_pixels}
-                                    )
+            files = sorted(os.listdir(datadir))
+            files = [f for f in files if '.nc' in f]
+            start_dates, end_dates = find_swot_start_end(files, file_prefix)
 
-            # Assign the expanded time dimension to the dataset
-            ds['time'] = time_expanded
-            ds['num_lines'] = ds['num_lines'] + num_lines_global
-            num_lines_global += ds['num_lines'].shape[0]
-            datasets.append(ds[keep_vars])
+            files_load = []
+
+            for i, f in enumerate(files):
+                if end_dates[i]>window_start and start_dates[i]<window_end:
+                    files_load.append(f)
+                elif start_dates[i]>window_start and start_dates[i]<window_end:
+                    files_load.append(f)
+                elif end_dates[i]>window_start and end_dates[i]<window_end:
+                    files_load.append(f)
+
+            paths_load = [datadir +'/' + f for f in files_load]
+            paths_load = sorted(paths_load)
+
+            num_lines_global = 0
+            datasets = []
+            for i, f in enumerate(paths_load):
+                ds = xr.open_dataset(f)
+                
+                ds = ds.drop(['i_num_line', 'i_num_pixel'])
+                time_expanded = xr.DataArray(
+                                            np.repeat(ds.time.values[:, np.newaxis], ds['num_pixels'].values.shape[0], -1),
+                                            dims=('num_lines', 'num_pixels'),
+                                            coords={'num_lines': ds.num_lines, 'num_pixels': ds.num_pixels}
+                                        )
+
+                # Assign the expanded time dimension to the dataset
+                ds['time'] = time_expanded
+                ds['num_lines'] = ds['num_lines'] + num_lines_global
+                num_lines_global += ds['num_lines'].shape[0]
+                datasets.append(ds[keep_vars])
+
+            self.ds = xr.concat(datasets, dim = 'num_lines')
             
-        self.ds = xr.concat(datasets, dim = 'num_lines')
+        else:
+            self.ds = ds
         
     def subset(self, lon_min = None, lon_max = None, lat_min = None, lat_max = None, time_min = None, time_max = None):
         # longitude masking
@@ -96,6 +107,25 @@ class SWOT_L3_Dataset:
         total_mask = mask_lon & mask_lat & mask_time
         
         return self.ds.where(total_mask, drop = True)
+    
+    
+        bounds = {'lon_min': lon_min, 
+                  'lon_max': lon_max, 
+                  'lat_min': lat_min,
+                  'lat_max': lat_max,
+                  'time_min': time_min,
+                  'time_max': time_max
+                 }
+        
+        # return another instance of the class but with subset
+        return SWOT_L3_Dataset(datadir = self.datadir, 
+                              window_start = self.window_start, 
+                              window_end = self.window_end,
+                              keep_vars = self.keep_vars,
+                              file_prefix = self.file_prefix,
+                              ds = self.ds.where(total_mask, drop = True),
+                              bounds = bounds
+                             )
     
 class Map_L4_Dataset:
     
@@ -112,11 +142,14 @@ class Map_L4_Dataset:
         
     """
     
-    def __init__(self, datadir, window_start, window_end, keep_vars = ['sla', 'adt'], name_convention = {'prefix': 'NeurOST_SSH-SST_', 'date_hyphenated': False, 'suffix_format': '_YYYYMMDD.nc'}):
+    def __init__(self, datadir, window_start, window_end, keep_vars = ['sla', 'adt'], name_convention = {'prefix': 'NeurOST_SSH-SST_', 'date_hyphenated': False, 'suffix_format': '_YYYYMMDD.nc'}, ds = None, bounds = None):
         
+        self.datadir = datadir
         self.window_start = window_start
         self.window_end = window_end
         self.keep_vars = keep_vars
+        self.name_convention = name_convention
+        self.bounds = bounds
         
         def extract_map_date(files, name_convention):
             return [f[len(name_convention['prefix']):-len(name_convention['suffix_format'])] for f in files]
@@ -124,42 +157,47 @@ class Map_L4_Dataset:
         def str_to_datetime(string):
             return np.datetime64(string[:4] + '-' + string[4:6] + '-' + string[6:8] + "T00:00:00")
         
-        files = sorted(os.listdir(datadir))
-        files = [f for f in files if '.nc' in f]
+        if ds is None:
         
-        map_date_strs = extract_map_date(files, name_convention)
-        
-        if name_convention['date_hyphenated']:
-            map_date_strs = [s.replace('-', '') for s in map_date_strs]
-        
-        map_dates = [str_to_datetime(s) for s in map_date_strs]
-        
-        files_load = []
-        for i, f in enumerate(files):
-            check_start = (map_dates[i] > window_start)
-            check_end = (map_dates[i] < window_end + np.timedelta64(1, 'D')) # add 1 day to end to allow interpolation
-            if check_start and check_end:
-                files_load.append(f)
-        
-        if datadir[-1] == '/':
-            files_load = [datadir + f for f in files_load]
+            files = sorted(os.listdir(datadir))
+            files = [f for f in files if '.nc' in f]
+
+            map_date_strs = extract_map_date(files, name_convention)
+
+            if name_convention['date_hyphenated']:
+                map_date_strs = [s.replace('-', '') for s in map_date_strs]
+
+            map_dates = [str_to_datetime(s) for s in map_date_strs]
+
+            files_load = []
+            for i, f in enumerate(files):
+                check_start = (map_dates[i] > window_start)
+                check_end = (map_dates[i] < window_end + np.timedelta64(1, 'D')) # add 1 day to end to allow interpolation
+                if check_start and check_end:
+                    files_load.append(f)
+
+            if datadir[-1] == '/':
+                files_load = [datadir + f for f in files_load]
+            else:
+                files_load = [datadir + '/' + f for f in files_load]
+
+            self.ds = xr.open_mfdataset(files_load)
+
+            # clean up to make sure names and ranges consistent with SWOT coords:
+
+            if 'lon' in list(self.ds.dims):
+                self.ds = self.ds.rename({'lon': 'longitude'})
+            if 'lat' in list(self.ds.dims):
+                self.ds = self.ds.rename({'lat': 'latitude'})
+
+            if self.ds['longitude'].min() < 0:
+                self.ds['longitude'] = self.ds['longitude'] % 360
+                self.ds = self.ds.sortby('longitude')
+
+            self.ds = self.ds[keep_vars]
+            
         else:
-            files_load = [datadir + '/' + f for f in files_load]
-            
-        self.ds = xr.open_mfdataset(files_load)
-        
-        # clean up to make sure names and ranges consistent with SWOT coords:
-        
-        if 'lon' in list(self.ds.dims):
-            self.ds = self.ds.rename({'lon': 'longitude'})
-        if 'lat' in list(self.ds.dims):
-            self.ds = self.ds.rename({'lat': 'latitude'})
-        
-        if self.ds['longitude'].min() < 0:
-            self.ds['longitude'] = self.ds['longitude'] % 360
-            self.ds = self.ds.sortby('longitude')
-            
-        self.ds = self.ds[keep_vars]
+            self.ds = ds
         
     def subset(self, lon_min = None, lon_max = None, lat_min = None, lat_max = None, time_min = None, time_max = None):
         # longitude masking
@@ -184,7 +222,23 @@ class Map_L4_Dataset:
         
         total_mask = mask_lon & mask_lat & mask_time
         
-        return self.ds.where(total_mask, drop = True)
+        bounds = {'lon_min': lon_min, 
+                  'lon_max': lon_max, 
+                  'lat_min': lat_min,
+                  'lat_max': lat_max,
+                  'time_min': time_min,
+                  'time_max': time_max
+                 }
+        
+        # return another instance of the class but with subset
+        return Map_L4_Dataset(datadir = self.datadir, 
+                              window_start = self.window_start, 
+                              window_end = self.window_end,
+                              keep_vars = self.keep_vars,
+                              name_convention = self.name_convention,
+                              ds = self.ds.where(total_mask, drop = True),
+                              bounds = bounds
+                             )
             
         
         
