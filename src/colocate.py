@@ -38,6 +38,10 @@ def interp_L4_to_L3(L4_Dataset, L3_Dataset, method = 'linear'):
     
     result.add_vars(data = [interp_result[var_name] for var_name in interp_result.data_vars], var_names = [var_name + '_map' for var_name in interp_result.data_vars])
     
+    mask_l4_nan = ~ds_l3[var_names[0] + '_map'].isnull()
+    for var in ds_l3.data_vars:
+        result.ds[var] = ds_l3[var].where(mask_l4_nan)
+    
     return result
     
     
