@@ -1,6 +1,4 @@
-import numpy as np
 import xarray as xr
-from src.loaders import SWOT_L3_Dataset
 
 def interp_L4_to_L3(L4_Dataset, L3_Dataset, method = 'linear'):
     """Interpolate L4 Mapped dataset onto a L3 SWOT dataset.
@@ -30,8 +28,15 @@ def interp_L4_to_L3(L4_Dataset, L3_Dataset, method = 'linear'):
     ).reset_coords()
     
     exclude = ["time", "latitude", "longitude"]
+    interp_result = interp_result.drop(exclude)
     
-    result.add_vars(data = [interp_result[var_name] for var_name in interp_result.data_vars if var_name not in exclude], var_names = [var_name + '_map' for var_name in interp_result.data_vars if var_name not in exclude])
+    mask = ~ds_l3['ssha'].isnull()
+    
+    for var in interp_result.data_vars: 
+        #if var not in exclude:
+        interp_result[var] = interp_result[var].where(mask)
+    
+    result.add_vars(data = [interp_result[var_name] for var_name in interp_result.data_vars], var_names = [var_name + '_map' for var_name in interp_result.data_vars])
     
     return result
     

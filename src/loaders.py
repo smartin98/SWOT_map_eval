@@ -18,7 +18,6 @@ def find_swot_start_end(files, file_prefix = 'SWOT_L3_LR_SSH_Basic_XXX_YYY_'):
 
 
 class SWOT_L3_Dataset:
-    
     """
     A dataset for storing SWOT L3 data from all granules between two datetimes, concatenated alon the num_lines axis.
 
@@ -148,7 +147,6 @@ class SWOT_L3_Dataset:
             self.ds[name] = data[v]
     
 class Map_L4_Dataset:
-    
     """
     A dataset for storing Mapped L4 SSH data from a directory of NetCDFs with 1 file per day for dates between two datetimes.
 
