@@ -26,10 +26,10 @@ def spatial_aggregate(data, single_vars, pairwise_vars, lon_bin_size, lat_bin_si
     for var1, var2 in pairwise_vars:
         print('Binning diff between: ' + var1 + ' and ' + var2)
         binning.push(data['longitude'], data['latitude'], data[var1] - data[var2])
-        data_binned[var1] = {'sum': binning.variable('sum'), 'count': binning.variable('count')}
+        data_binned[var1 + '_diff'] = {'sum': binning.variable('sum'), 'count': binning.variable('count')}
         binning.clear()
         binning.push(data['longitude'], data['latitude'], (data[var1] - data[var2])**2)
-        data_binned[var1]['sum_squares'] = binning.variable('sum')
+        data_binned[var1 + '_diff']['sum_squares'] = binning.variable('sum')
         binning.clear()
         
     for v, var in enumerate(single_vars):
@@ -45,7 +45,7 @@ def spatial_aggregate(data, single_vars, pairwise_vars, lon_bin_size, lat_bin_si
                 
     for var1, var2 in pairwise_vars: 
         for s in ['sum', 'sum_squares', 'count']:
-            da = xr.DataArray(data_binned[var][s].T, dims=('latitude', 'longitude'), coords=[lat_bins, lon_bins])
+            da = xr.DataArray(data_binned[var + '_diff'][s].T, dims=('latitude', 'longitude'), coords=[lat_bins, lon_bins])
             ds[var1 + '_diff_' + s] = da
             
     return ds
@@ -68,9 +68,8 @@ def calculate_stats(data, single_vars, pairwise_vars):
         except:
             print("Variable not in data") 
             
-        # NOT WORKING, COME BACK TO
-        # data[var + '_R2'] = 1 - data[var + '_diff_sum_squares']/data[var + '_sum_squares']
-        # keep_vars.append(var + '_R2')
+        data[var + '_R2'] = 1 - data[var + '_diff_sum_squares']/data[var + '_sum_squares']
+        keep_vars.append(var + '_R2')
         
     return data[keep_vars]
 

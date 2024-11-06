@@ -4,6 +4,7 @@ import datetime
 import os
 import pandas as pd
 import datetime
+import gc
 
 def convert_string_to_npdatetime(string):
     datetime_obj = pd.to_datetime(string, format="%Y%m%dT%H%M%S", errors='coerce', yearfirst=True, utc=True)
@@ -50,6 +51,7 @@ class SWOT_L3_Dataset:
             files_load = []
 
             for i, f in enumerate(files):
+                
                 if end_dates[i]>window_start and start_dates[i]<window_end:
                     files_load.append(f)
                 elif start_dates[i]>window_start and start_dates[i]<window_end:
@@ -63,6 +65,8 @@ class SWOT_L3_Dataset:
             num_lines_global = 0
             datasets = []
             for i, f in enumerate(paths_load):
+                if i % 100 == 0:
+                    print(f'Loading file {i} out of {len(files_load)}')
                 ds = xr.open_dataset(f)
                 
                 ds = ds.drop(['i_num_line', 'i_num_pixel'])
@@ -76,14 +80,23 @@ class SWOT_L3_Dataset:
                 ds['time'] = time_expanded
                 ds['num_lines'] = ds['num_lines'] + num_lines_global
                 num_lines_global += ds['num_lines'].shape[0]
-                datasets.append(ds[keep_vars])
+                datasets.append(ds[keep_vars].load())
 
+            print('Concatenating datasets')
             self.ds = xr.concat(datasets, dim = 'num_lines')
             
+            del datasets
+            gc.collect()
+            
+            print('Removing times outside window')
             mask_time = ((self.ds['time'] > window_start) & (self.ds['time'] < window_end)).astype('bool')
             
             self.ds = self.ds.where(mask_time, drop = True)
             
+            del mask_time
+            gc.collect()
+            
+            print('Data loading complete')
         else:
             self.ds = ds
         
@@ -110,7 +123,7 @@ class SWOT_L3_Dataset:
         
         mask_total = mask_lon & mask_lat & mask_time
         
-        return self.ds.where(total_mask, drop = True)
+        return self.ds.where(mask_total, drop = True)
     
     
         bounds = {'lon_min': lon_min, 
@@ -145,6 +158,10 @@ class SWOT_L3_Dataset:
     def add_vars(self, data, var_names):
         for v, name in enumerate(var_names):
             self.ds[name] = data[v]
+            
+            
+    def length(self):
+        return self.ds['num_lines'].values.shape[0]
     
 class Map_L4_Dataset:
     """
