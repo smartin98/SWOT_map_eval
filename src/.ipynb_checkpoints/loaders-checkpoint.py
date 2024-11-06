@@ -122,9 +122,6 @@ class SWOT_L3_Dataset:
         # total mask by combining all 3:
         
         mask_total = mask_lon & mask_lat & mask_time
-        
-        return self.ds.where(mask_total, drop = True)
-    
     
         bounds = {'lon_min': lon_min, 
                   'lon_max': lon_max, 
