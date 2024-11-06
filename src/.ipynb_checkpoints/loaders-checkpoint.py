@@ -64,37 +64,41 @@ class SWOT_L3_Dataset:
 
             num_lines_global = 0
             datasets = []
-            for i, f in enumerate(paths_load):
-                if i % 100 == 0:
-                    print(f'Loading file {i} out of {len(files_load)}')
-                ds = xr.open_dataset(f)
-                
-                ds = ds.drop(['i_num_line', 'i_num_pixel'])
-                time_expanded = xr.DataArray(
-                                            np.repeat(ds.time.values[:, np.newaxis], ds['num_pixels'].values.shape[0], -1),
-                                            dims=('num_lines', 'num_pixels'),
-                                            coords={'num_lines': ds.num_lines, 'num_pixels': ds.num_pixels}
-                                        )
+            if len(paths_load) > 0:
+                for i, f in enumerate(paths_load):
+                    if i % 100 == 0:
+                        print(f'Loading file {i} out of {len(files_load)}')
+                    ds = xr.open_dataset(f)
 
-                # Assign the expanded time dimension to the dataset
-                ds['time'] = time_expanded
-                ds['num_lines'] = ds['num_lines'] + num_lines_global
-                num_lines_global += ds['num_lines'].shape[0]
-                datasets.append(ds[keep_vars].load())
+                    ds = ds.drop(['i_num_line', 'i_num_pixel'])
+                    time_expanded = xr.DataArray(
+                                                np.repeat(ds.time.values[:, np.newaxis], ds['num_pixels'].values.shape[0], -1),
+                                                dims=('num_lines', 'num_pixels'),
+                                                coords={'num_lines': ds.num_lines, 'num_pixels': ds.num_pixels}
+                                            )
 
-            print('Concatenating datasets')
-            self.ds = xr.concat(datasets, dim = 'num_lines')
+                    # Assign the expanded time dimension to the dataset
+                    ds['time'] = time_expanded
+                    ds['num_lines'] = ds['num_lines'] + num_lines_global
+                    num_lines_global += ds['num_lines'].shape[0]
+                    datasets.append(ds[keep_vars].load())
+
+                print('Concatenating datasets')
+                self.ds = xr.concat(datasets, dim = 'num_lines')
+
+                del datasets
+                gc.collect()
+
+                print('Removing times outside window')
+                mask_time = ((self.ds['time'] > window_start) & (self.ds['time'] < window_end)).astype('bool')
+
+                self.ds = self.ds.where(mask_time, drop = True)
+
+                del mask_time
+                gc.collect()
             
-            del datasets
-            gc.collect()
-            
-            print('Removing times outside window')
-            mask_time = ((self.ds['time'] > window_start) & (self.ds['time'] < window_end)).astype('bool')
-            
-            self.ds = self.ds.where(mask_time, drop = True)
-            
-            del mask_time
-            gc.collect()
+            else:
+                self.ds = None
             
             print('Data loading complete')
         else:
@@ -158,7 +162,10 @@ class SWOT_L3_Dataset:
             
             
     def length(self):
-        return self.ds['num_lines'].values.shape[0]
+        if self.ds is not None:
+            return self.ds['num_lines'].values.shape[0]
+        else: 
+            return 0
     
 class Map_L4_Dataset:
     """
