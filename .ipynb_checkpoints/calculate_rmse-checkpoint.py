@@ -4,6 +4,7 @@ import cmocean
 from src.loaders import *
 from src.colocate import *
 from src.metrics import *
+from src.filter import *
 import os
 import pandas as pd
 import datetime
@@ -25,6 +26,7 @@ parser.add_argument('--swot_dir', type = str, help = 'path to directory containi
 parser.add_argument('--map_dir', type = str, help = 'path to directory containing mapped L4 data')
 parser.add_argument('--output_dir', type = str, help = 'path to directory to save results')
 parser.add_argument('--output_name', type = str, help = 'filename in which to save results')
+parser.add_argument('--map_file_prefix', type = str, help = 'filename up to map date of map files')
 
 args = parser.parse_args()
 
@@ -91,6 +93,16 @@ else:
     output_dir = args.output_dir
     if output_dir[-1] != '/':
         output_dir = output_dir + '/'
+if args.map_file_prefix is None:
+    print('map_file_prefix not specified, defaulting to NeurOST_SSH-SST_')
+    map_file_prefix = 'NeurOST_SSH-SST_'
+else:
+    map_file_prefix = args.map_file_prefix
+    
+name_convention = {'prefix': map_file_prefix,
+                   'date_hyphenated': False,
+                   'suffix_format': '_YYYYMMDD.nc',
+                  }
 
 if args.output_name is None:
     n_outputs = len(os.listdir(output_dir))
@@ -147,8 +159,9 @@ for i, t in enumerate(date_array):
 
     print(f'Processing: {start} to {end}')
     swot_data = SWOT_L3_Dataset(swot_dir, start, end, file_prefix = 'SWOT_L3_LR_SSH_Expert_XXX_YYY_')
-    map_data = Map_L4_Dataset(map_dir, start, end)
+    map_data = Map_L4_Dataset(map_dir, start, end, name_convention = name_convention)
     interp = interp_L4_to_L3(map_data, swot_data)
+    interp = along_track_filter(interp, scale = 200e3, filt_type = 'high_pass', filt_vars = ['ssha', 'sla_map'])
     
     del swot_data, map_data
     
@@ -158,8 +171,8 @@ for i, t in enumerate(date_array):
     
     if interp is not None:
         agg, stats = calc_aggregate_stats(data = interp.ds, 
-                                          single_vars = ['sla_map', 'ssha'], 
-                                          pairwise_vars = [['ssha', 'sla_map']], 
+                                          single_vars = ['sla_map', 'ssha', 'sla_map_filtered', 'ssha_filtered'], 
+                                          pairwise_vars = [['ssha', 'sla_map'], ['ssha_filtered', 'sla_map_filtered']], 
                                           lon_bin_size = 1, 
                                           lat_bin_size = 1, 
                                           lon_bounds = lon_bounds,

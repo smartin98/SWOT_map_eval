@@ -92,7 +92,7 @@ class SWOT_L3_Dataset:
                 print('Removing times outside window')
                 mask_time = ((self.ds['time'] > window_start) & (self.ds['time'] < window_end)).astype('bool')
 
-                self.ds = self.ds.where(mask_time, drop = True)
+                self.ds = self.ds.where(mask_time, drop = True).load()
 
                 del mask_time
                 gc.collect()
@@ -233,7 +233,7 @@ class Map_L4_Dataset:
                 self.ds['longitude'] = self.ds['longitude'] % 360
                 self.ds = self.ds.sortby('longitude')
                 
-            self.ds = self.ds[keep_vars]
+            self.ds = self.ds[keep_vars].load()
         else:
             self.ds = ds
         

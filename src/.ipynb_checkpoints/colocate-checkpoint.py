@@ -33,7 +33,7 @@ def interp_L4_to_L3(L4_Dataset, L3_Dataset, method = 'linear'):
         ).reset_coords()
 
         exclude = ["time", "latitude", "longitude", "Lambert_Azimuthal_Grid"]
-        interp_result = interp_result.drop(exclude)
+        interp_result = interp_result.drop([var for var in exclude if var in interp_result.data_vars])
 
         mask = ~ds_l3['ssha'].isnull()
 

@@ -45,7 +45,7 @@ def spatial_aggregate(data, single_vars, pairwise_vars, lon_bin_size, lat_bin_si
                 
     for var1, var2 in pairwise_vars: 
         for s in ['sum', 'sum_squares', 'count']:
-            da = xr.DataArray(data_binned[var + '_diff'][s].T, dims=('latitude', 'longitude'), coords=[lat_bins, lon_bins])
+            da = xr.DataArray(data_binned[var1 + '_diff'][s].T, dims=('latitude', 'longitude'), coords=[lat_bins, lon_bins])
             ds[var1 + '_diff_' + s] = da
             
     return ds
