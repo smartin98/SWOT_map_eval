@@ -135,16 +135,29 @@ ds_results = xr.Dataset(
         "ssha_sum": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
         "ssha_sum_squares": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
         "ssha_count": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "ssha_filtered_sum": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "ssha_filtered_sum_squares": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "ssha_filtered_count": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
         "sla_map_sum": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
         "sla_map_sum_squares": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
         "sla_map_count": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "sla_map_filtered_sum": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "sla_map_filtered_sum_squares": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "sla_map_filtered_count": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
         "ssha_diff_sum": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
         "ssha_diff_sum_squares": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
         "ssha_diff_count": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "ssha_filtered_diff_sum": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "ssha_filtered_diff_sum_squares": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "ssha_filtered_diff_count": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
         "sla_map_variance": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
         "ssha_variance": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
         "ssha_mse": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
         "ssha_R2": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "sla_map_filtered_variance": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "ssha_filtered_variance": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "ssha_filtered_mse": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
+        "ssha_filtered_R2": (["time", "lat", "lon"], np.full((len(date_array), N_lat, N_lon), np.nan)),
     },
     coords={
         "time": date_array,
@@ -161,7 +174,6 @@ for i, t in enumerate(date_array):
     swot_data = SWOT_L3_Dataset(swot_dir, start, end, file_prefix = 'SWOT_L3_LR_SSH_Expert_XXX_YYY_')
     map_data = Map_L4_Dataset(map_dir, start, end, name_convention = name_convention)
     interp = interp_L4_to_L3(map_data, swot_data)
-    interp = along_track_filter(interp, scale = 200e3, filt_type = 'high_pass', filt_vars = ['ssha', 'sla_map'])
     
     del swot_data, map_data
     
@@ -170,6 +182,7 @@ for i, t in enumerate(date_array):
     
     
     if interp is not None:
+        interp = along_track_filter(interp, scale = 100e3, filt_type = 'high_pass', filt_vars = ['ssha', 'sla_map'])
         agg, stats = calc_aggregate_stats(data = interp.ds, 
                                           single_vars = ['sla_map', 'ssha', 'sla_map_filtered', 'ssha_filtered'], 
                                           pairwise_vars = [['ssha', 'sla_map'], ['ssha_filtered', 'sla_map_filtered']], 
@@ -185,5 +198,5 @@ for i, t in enumerate(date_array):
         for var in stats.data_vars:
             ds_results[var][i,:,:] = stats[var].values
         
-ds_results.to_netcdf(output_path)
+ds_results.astype('float32').to_netcdf(output_path)
         

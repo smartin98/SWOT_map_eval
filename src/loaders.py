@@ -60,7 +60,7 @@ class SWOT_L3_Dataset:
                     files_load.append(f)
 
             paths_load = [datadir +'/' + f for f in files_load]
-            paths_load = sorted(paths_load)
+            paths_load = sorted(paths_load) # TO DO: fix sorting to sort by datetime rather than file name as they don't necessarily give same answer...
 
             num_lines_global = 0
             datasets = []
