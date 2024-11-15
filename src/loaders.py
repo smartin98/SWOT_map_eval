@@ -49,18 +49,25 @@ class SWOT_L3_Dataset:
             start_dates, end_dates = find_swot_start_end(files, file_prefix)
 
             files_load = []
+            start_dates_load = []
 
             for i, f in enumerate(files):
                 
                 if end_dates[i]>window_start and start_dates[i]<window_end:
                     files_load.append(f)
+                    start_dates_load.append(window_start)
                 elif start_dates[i]>window_start and start_dates[i]<window_end:
                     files_load.append(f)
+                    start_dates_load.append(window_start)
                 elif end_dates[i]>window_start and end_dates[i]<window_end:
                     files_load.append(f)
+                    start_dates_load.append(window_start)
 
-            paths_load = [datadir +'/' + f for f in files_load]
-            paths_load = sorted(paths_load) # TO DO: fix sorting to sort by datetime rather than file name as they don't necessarily give same answer...
+            if datadir[-1] == '/':
+                paths_load = [datadir + f for f in files_load]
+            else:
+                paths_load = [datadir +'/' + f for f in files_load]
+            paths_load = [x for _, x in sorted(zip(start_dates_load, paths_load))]
 
             num_lines_global = 0
             datasets = []
