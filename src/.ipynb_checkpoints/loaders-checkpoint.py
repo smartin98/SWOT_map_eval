@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import datetime
 import gc
+import copy
 
 def convert_string_to_npdatetime(string):
     datetime_obj = pd.to_datetime(string, format="%Y%m%dT%H%M%S", errors='coerce', yearfirst=True, utc=True)
@@ -16,6 +17,9 @@ def find_swot_start_end(files, file_prefix = 'SWOT_L3_LR_SSH_Basic_XXX_YYY_'):
     end_dates = [convert_string_to_npdatetime(f[len(file_prefix)+16:len(file_prefix)+16+15]) for f in files]
     
     return start_dates, end_dates
+
+def get_product_version(dirname):
+    return int(dirname.split("_")[-1][0])
 
 
 class SWOT_L3_Dataset:
@@ -40,6 +44,8 @@ class SWOT_L3_Dataset:
         self.keep_vars = keep_vars
         self.file_prefix = file_prefix
         self.bounds = bounds
+        
+        self.SWOT_version = get_product_version(datadir)
         
         if ds is None:
         
@@ -76,8 +82,13 @@ class SWOT_L3_Dataset:
                     if i % 100 == 0:
                         print(f'Loading file {i} out of {len(files_load)}')
                     ds = xr.open_dataset(f)
-
-                    ds = ds.drop(['i_num_line', 'i_num_pixel'])
+                    
+                    if self.SWOT_version == 2:
+                        ds = ds.rename({'ssha_unfiltered': 'ssha', 'ssha_filtered': 'ssha_noiseless'})
+                    try:
+                        ds = ds.drop(['i_num_line', 'i_num_pixel'])
+                    except:
+                        pass
                     time_expanded = xr.DataArray(
                                                 np.repeat(ds.time.values[:, np.newaxis], ds['num_pixels'].values.shape[0], -1),
                                                 dims=('num_lines', 'num_pixels'),
@@ -148,7 +159,7 @@ class SWOT_L3_Dataset:
                               window_end = self.window_end,
                               keep_vars = self.keep_vars,
                               file_prefix = self.file_prefix,
-                              ds = self.ds.where(mask_total, drop = True),
+                              ds = copy.deepcopy(self.ds.where(mask_total, drop = True)),
                               bounds = bounds
                              )
     
@@ -159,7 +170,7 @@ class SWOT_L3_Dataset:
                               window_end = self.window_end,
                               keep_vars = self.keep_vars,
                               file_prefix = self.file_prefix,
-                              ds = self.ds,
+                              ds = copy.deepcopy(self.ds),
                               bounds = self.bounds
                              )
     
